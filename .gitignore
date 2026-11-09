@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+*.log
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+.n8n/
+n8n-data/
+credentials.json
+service-account*.json
+*-credentials*.json
+backups/
+exports-with-secrets/

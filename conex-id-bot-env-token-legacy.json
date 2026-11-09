@@ -1,0 +1,1383 @@
+{
+  "name": "CONEX ID BOT — Project Management & BOM (Legacy Env Token)",
+  "nodes": [
+    {
+      "id": "2bcf6053-79fd-4b6b-9b2d-c2802e6add9e",
+      "name": "SETUP — Read First",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -420
+      ],
+      "parameters": {
+        "content": "## CONEX ID BOT — تنظیمات پیش از انتشار\n\n۱) در Google Sheets چهار برگه با نام دقیق **Projects**، **Users**، **Sessions** و **AuditLog** بسازید.\n\n۲) در هفت نود Google Sheets، شناسه فایل را جایگزین کنید و یک Google Sheets OAuth Credential مشترک انتخاب کنید.\n\n۳) روی سرور n8n متغیر محیطی **BALE_BOT_TOKEN** را با توکن جدید تنظیم کنید. توکن را در فایل JSON قرار ندهید.\n\n۴) در نود **Plan Bot Response** شناسه مدیر بازیابی را پس از بررسی `/id` تأیید کنید.\n\n۵) پس از تنظیم، ورک‌فلو را منتشر و Production Webhook را با API رسمی بله ثبت کنید.\n\n**ابتدا با پروژه‌های واقعی خودتان و دو حساب مجاز تست کامل انجام دهید.**",
+        "height": 345,
+        "width": 990,
+        "color": 5
+      }
+    },
+    {
+      "id": "b81b5c5a-57ea-404d-88f1-45fb7b633866",
+      "name": "DATABASE — Exact Columns",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        -460
+      ],
+      "parameters": {
+        "content": "## ستون‌های دقیق Google Sheets\n\n**Projects**\n`Project_ID | Project_Name | Project_Group | SAP_Code | BOM_Status | BOM_Updated_At | BOM_Updated_By | Updated_At | Updated_By`\n\n**Users**\n`User_ID | Display_Name | Role | Active | Updated_At | Updated_By`\n\n**Sessions**\n`User_ID | Step | Draft_JSON | Updated_At`\n\n**AuditLog**\n`Event_ID | Action | Entity_ID | User_ID | Timestamp | Before_JSON | After_JSON`\n\nهر کدام یک سطر عنوان در ردیف اول داشته باشند. کد SAP و شناسه‌ها را با قالب Text نگهداری کنید.",
+        "height": 350,
+        "width": 1060,
+        "color": 4
+      }
+    },
+    {
+      "id": "30c9d546-dcde-4dbe-8adc-9d113199712c",
+      "name": "SECURITY — Important",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2370,
+        -460
+      ],
+      "parameters": {
+        "content": "## امنیت بهره‌برداری\n\n- توکن بله و کلید API قبلاً در گفتگو منتشر شده‌اند؛ هر دو را فوراً تعویض کنید.\n- فقط شناسه‌های مجاز از جدول Users می‌توانند اطلاعات ببینند. `/id` برای شناسایی کاربر باز است.\n- آدرس وب‌هوک را عمومی منتشر نکنید. در API فعلی بله امضای قابل‌اتکای وب‌هوک برای این نمونه تأیید نشده؛ پیش از استفاده سازمانی احراز اصالت درخواست‌ها را با واحد IT بررسی کنید.\n- Google Sheets تراکنش/قفل ردیف شبیه دیتابیس SQL ندارد؛ ثبت هم‌زمان توسط چند مدیر را در پذیرش نهایی آزمایش کنید.\n- دسترسی فایل اصلی را فقط به هویت n8n و مدیرهای مورد تأیید بدهید.",
+        "height": 345,
+        "width": 1180,
+        "color": 3
+      }
+    },
+    {
+      "id": "1f6750e7-1ed7-43b9-ab79-83a261083fbf",
+      "name": "BACKUP — Enable After Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        900
+      ],
+      "parameters": {
+        "content": "## نسخه پشتیبان روزانه\n\nمسیر Daily Backup → Copy Sheet Backup عمداً غیرفعال است.\nپس از انتخاب Google Drive Credential، شناسه فولدر پشتیبان و تنظیمات فایل، **هر دو نود را فعال کنید**. زمان برنامه ۲:۰۰ بامداد تهران است.\nاین نود کپی جداگانه‌ای از همان Google Spreadsheet می‌سازد؛ بررسی کنید پوشه انتخابی محدود و نسخه‌های قدیمی طبق سیاست شرکت نگهداری شوند.",
+        "height": 220,
+        "width": 700,
+        "color": 6
+      }
+    },
+    {
+      "id": "conex-003",
+      "name": "Bale Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        150
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "CHANGE_ME_TO_A_RANDOM_WEBHOOK_PATH",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-004",
+      "name": "Normalize Bale Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        150
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const update = $input.first().json.body || $input.first().json;\nconst cb = update.callback_query || null;\nconst m = update.message || cb?.message || {};\nconst from = cb?.from || m.from || {};\nconst chatId = m.chat?.id;\nif (!chatId || !from.id) throw new Error('Bale event lacks chat/user ID');\nreturn [{json:{\n  chat_id:String(chatId), user_id:String(from.id),\n  text:String(update.message?.text || '').trim(),\n  callback:String(cb?.data || ''),\n  callback_id:String(cb?.id || ''),\n  event_id:String(update.update_id || ''),\n  received_at:new Date().toISOString(),\n}}];"
+      }
+    },
+    {
+      "id": "conex-005",
+      "name": "Read Sessions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        150
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sessions",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "1e9825ce-74c4-4ac2-8b0d-f17878143181",
+      "name": "Read Users",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        150
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Users",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-006",
+      "name": "Read Projects",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        150
+      ],
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Projects",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-007",
+      "name": "Plan Bot Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        150
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// CONEX ID 2.0: project workflow backed by 4 Google Sheets tabs.\n// Recovery admin. Verify that this is a USER ID (use /id), not only chat ID.\nconst BOOTSTRAP_ADMIN_USER_IDS = ['REPLACE_WITH_YOUR_BALE_USER_ID'];\nconst ENABLE_PUBLIC_READ = false;\n\nconst incoming = $('Normalize Bale Event').first().json;\nconst allSessions = $('Read Sessions').all().map(i=>i.json).filter(r=>r && r.User_ID);\nconst allProjects = $('Read Projects').all().map(i=>i.json).filter(r=>r && r.Project_ID);\nconst allUsers = $('Read Users').all().map(i=>i.json).filter(r=>r && r.User_ID);\nconst readError = ['Read Sessions','Read Users','Read Projects'].some(name =>\n  $(name).all().some(item => !!item.json?.error));\nconst userId = String(incoming.user_id);\nconst chatId = String(incoming.chat_id);\nconst userRecord=allUsers.find(u=>String(u.User_ID)===userId);\nconst active = userRecord && ['true','1','yes','active'].includes(String(userRecord.Active).toLowerCase());\nconst isAdmin = BOOTSTRAP_ADMIN_USER_IDS.includes(userId) || !!(active && userRecord.Role==='admin');\nconst isAllowed = isAdmin || ENABLE_PUBLIC_READ || !!active;\nconst now = new Date().toISOString();\n\nfunction norm(x) {\n  const persian = '۰۱۲۳۴۵۶۷۸۹';\n  const arabic = '٠١٢٣٤٥٦٧٨٩';\n  return String(x ?? '').normalize('NFKC').replace(/[ي]/g,'ی').replace(/[ك]/g,'ک')\n    .replace(/[۰-۹]/g,c=>String(persian.indexOf(c)))\n    .replace(/[٠-٩]/g,c=>String(arabic.indexOf(c)))\n    .toLowerCase().replace(/[\\s_\\-–—]+/g,'').trim();\n}\nfunction button(label, action) { return {text:label, callback_data:action}; }\nfunction kb(rows) { return {inline_keyboard:rows}; }\nfunction mainKeyboard() {\n  const rows = [\n    [button('🔎 جستجوی پروژه','m:search')],\n    [button('📋 لیست پروژه‌ها','m:list:0'),button('📊 وضعیت BOM','m:bom')],\n    [button('📈 آمار پروژه‌ها','m:stats')],\n  ];\n  if (isAdmin) {\n    rows.push([button('➕ ثبت پروژه جدید','m:add'),button('🛠 مدیریت پروژه‌ها','m:manage:0')]);\n    rows.push([button('👥 مدیریت کاربران','m:users:0')]);\n  }\n  return kb(rows);\n}\nfunction back() { return [button('🏠 منوی اصلی','m:main')]; }\nfunction statusName(s) { return s === 'registered' ? '✅ ثبت شده' : s === 'not_registered' ? '❌ ثبت نشده' : '❔ نامشخص'; }\nfunction projectText(p) {\n  return '📁 پروژه: '+String(p.Project_Name||'—')+'\\n'+\n    'گروه پروژه: '+String(p.Project_Group||'—')+'\\n'+\n    'کد SAP: '+String(p.SAP_Code||'—')+'\\n'+\n    'BOM: '+statusName(p.BOM_Status)+'\\n'+\n    'ثبت/تغییر BOM: '+String(p.BOM_Updated_At||'—')+'\\n'+\n    'آخرین تغییر پروژه: '+String(p.Updated_At||'—');\n}\nfunction details(p) {\n  const rows=[];\n  if(isAdmin) rows.push([button('✏️ ویرایش پروژه','e:'+p.Project_ID),button('🔄 تغییر BOM','b:'+p.Project_ID)]);\n  rows.push([button('🔎 جستجوی جدید','m:search')],back());\n  return {text:projectText(p),keyboard:kb(rows)};\n}\nfunction paged(list,page,prefix,label) {\n  const size=6, pages=Math.max(1,Math.ceil(list.length/size));\n  page=Math.max(0,Math.min(pages-1,Number(page)||0));\n  if(!list.length) return {text:'موردی برای نمایش وجود ندارد.',keyboard:kb([back()])};\n  const rows=list.slice(page*size,page*size+size).map(p=>[button(String(p.Project_Name||p.Project_ID).slice(0,50),'p:'+p.Project_ID)]);\n  const pager=[];\n  if(page>0) pager.push(button('◀️ قبلی',prefix+':'+(page-1)));\n  if(page<pages-1) pager.push(button('بعدی ▶️',prefix+':'+(page+1)));\n  if(pager.length) rows.push(pager);\n  rows.push(back());\n  return {text:label+' — صفحه '+(page+1)+' از '+pages+' ('+list.length+' مورد)',keyboard:kb(rows)};\n}\nfunction findProject(id) { return allProjects.find(p=>String(p.Project_ID)===id); }\nfunction findUser(id) { return allUsers.find(u=>String(u.User_ID)===id); }\nfunction userDetails(u) {\n  return 'کاربر: '+String(u.Display_Name||'—')+'\\nشناسه بله: '+u.User_ID+'\\nنقش: '+String(u.Role||'viewer')+'\\nفعال: '+String(u.Active);\n}\nfunction userMenu(u) {\n  return kb([\n    [button('👁 مشاهده‌گر','ur:v:'+u.User_ID),button('👑 مدیر','ur:a:'+u.User_ID)],\n    [button(String(u.Active).toLowerCase()==='true'?'🚫 غیرفعال‌سازی':'✅ فعال‌سازی','ut:'+u.User_ID)],\n    [button('👥 فهرست کاربران','m:users:0')],back(),\n  ]);\n}\nfunction userPaged(page) {\n  const users=allUsers.slice().sort((a,b)=>String(a.Display_Name).localeCompare(String(b.Display_Name),'fa'));\n  const size=6,pages=Math.max(1,Math.ceil(users.length/size));\n  page=Math.max(0,Math.min(pages-1,Number(page)||0));\n  const rows=users.slice(page*size,page*size+size).map(u=>[button(String(u.Display_Name||u.User_ID).slice(0,45),'user:'+u.User_ID)]);\n  const nav=[];\n  if(page>0)nav.push(button('◀️ قبلی','m:users:'+(page-1)));\n  if(page<pages-1)nav.push(button('بعدی ▶️','m:users:'+(page+1)));\n  if(nav.length)rows.push(nav);\n  rows.push([button('➕ افزودن همکار','m:uadd')],back());\n  return {text:'👥 کاربران مجاز: '+users.length+' — صفحه '+(page+1)+' از '+pages,keyboard:kb(rows)};\n}\n\nlet s = allSessions.find(x=>String(x.User_ID)===userId) || {};\nlet step = String(s.Step||'idle');\nlet draft = {};\ntry { draft=JSON.parse(s.Draft_JSON||'{}') || {}; } catch { draft={}; }\nif(s.Updated_At && Date.now()-Date.parse(s.Updated_At)>30*60*1000){step='idle';draft={};}\n\nlet text=''; let keyboard=mainKeyboard(); let mutation=null;\nlet userMutation=null;let audit=null;\nfunction say(t,k=mainKeyboard()){text=t;keyboard=k;}\nfunction reset(){step='idle';draft={};}\nfunction ask(t){say(t,kb([[button('❌ لغو','m:main')]]));}\nfunction auditChange(action,entity,before,after){\n  audit={Event_ID:String(incoming.event_id||'callback')+'-'+action+'-'+entity,\n    Action:action,Entity_ID:String(entity),User_ID:userId,Timestamp:now,\n    Before_JSON:JSON.stringify(before||{}),After_JSON:JSON.stringify(after||{})};\n}\n\n// Anyone can determine their real Bale user ID without accessing factory data.\nif(readError) {\n  reset();say('⚠️ ارتباط با بانک اطلاعاتی پروژه‌ها برقرار نیست. لطفاً کمی بعد دوباره تلاش کنید.\\nاین خطا در اجرای n8n ثبت شده است.',kb([]));\n} else if(incoming.text==='/id') {\n  say('شناسه کاربر بله: '+userId+'\\nشناسه گفتگو: '+chatId+'\\nاین شناسه را فقط برای ثبت مجوز دسترسی استفاده کنید.');\n} else if(!isAllowed) {\n  reset();\n  say('⛔ دسترسی شما به اطلاعات پروژه‌های سازمان فعال نشده است.\\nشناسه کاربر: '+userId+'\\nاز مدیر بخواهید شناسه شما را به فهرست مجاز اضافه کند.',kb([]));\n} else if(incoming.callback==='m:main' || incoming.text==='/start' || incoming.text==='/cancel') {\n  reset();say('به دستیار اطلاعات پروژه‌های سازمان خوش آمدید. گزینه موردنظر را انتخاب کنید.');\n} else if(incoming.callback==='m:search') {\n  step='search';draft={};ask('🔎 نام پروژه، گروه پروژه یا کد SAP را تایپ کنید.');\n} else if(incoming.callback.startsWith('s:page:')) {\n  if(!draft.query){step='search';ask('جستجوی قبلی منقضی شده است. نام پروژه یا کد را دوباره وارد کنید.');}\n  else {const q=norm(draft.query);\n    const matches=allProjects.filter(p=>[p.Project_Name,p.Project_Group,p.SAP_Code].some(v=>norm(v).includes(q)));\n    const d=paged(matches,incoming.callback.split(':')[2],'s:page','🔎 نتایج جستجوی «'+draft.query+'»');step='search_results';say(d.text,d.keyboard);}\n} else if(incoming.callback.startsWith('p:')) {\n  reset();const p=findProject(incoming.callback.slice(2));\n  if(p){const d=details(p);say(d.text,d.keyboard);} else say('پروژه پیدا نشد یا اطلاعات تغییر کرده است.');\n} else if(incoming.callback.startsWith('m:list:')) {\n  reset();const d=paged(allProjects.slice().sort((a,b)=>String(a.Project_Name).localeCompare(String(b.Project_Name),'fa')),incoming.callback.split(':')[2],'m:list','📋 فهرست پروژه‌ها');say(d.text,d.keyboard);\n} else if(incoming.callback==='m:bom') {\n  reset();say('وضعیت موردنظر را انتخاب کنید:',kb([\n    [button('✅ BOM ثبت شده','m:filter:y:0')],\n    [button('❌ BOM ثبت نشده','m:filter:n:0')],back()]));\n} else if(incoming.callback.startsWith('m:filter:')) {\n  reset();const a=incoming.callback.split(':');\n  const selected=allProjects.filter(p=>p.BOM_Status===(a[2]==='y'?'registered':'not_registered'));\n  const d=paged(selected,a[3],'m:filter:'+a[2],a[2]==='y'?'✅ دارای BOM':'❌ فاقد BOM');say(d.text,d.keyboard);\n} else if(incoming.callback==='m:stats') {\n  reset();const yes=allProjects.filter(p=>p.BOM_Status==='registered').length;\n  const no=allProjects.filter(p=>p.BOM_Status==='not_registered').length;\n  const unknown=allProjects.length-yes-no;\n  say('📊 گزارش پروژه‌های سازمان\\n'+\n    'کل پروژه‌ها: '+allProjects.length+'\\n'+\n    '✅ BOM ثبت شده: '+yes+'\\n'+\n    '❌ BOM ثبت نشده: '+no+'\\n'+\n    '❔ نامشخص: '+unknown+'\\n'+\n    'درصد ثبت BOM: '+(allProjects.length?(100*yes/allProjects.length).toFixed(1):'0')+'٪',\n    kb([[button('❌ پروژه‌های فاقد BOM','m:filter:n:0')],back()]));\n} else if(incoming.callback.startsWith('m:users:')) {\n  if(!isAdmin) say('⛔ فقط مدیر اجازه مشاهده کاربران را دارد.');\n  else {reset();const d=userPaged(incoming.callback.split(':')[2]);say(d.text,d.keyboard);}\n} else if(incoming.callback==='m:uadd') {\n  if(!isAdmin) say('⛔ فقط مدیر اجازه افزودن کاربر دارد.');\n  else {step='new_user_id';draft={};ask('شناسه عددی بله همکار جدید را وارد کنید.\\nهمکار می‌تواند با دستور /id شناسه خودش را ببیند.');}\n} else if(incoming.callback.startsWith('user:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {reset();const u=findUser(incoming.callback.slice(5));if(!u)say('کاربر پیدا نشد.');else say(userDetails(u),userMenu(u));}\n} else if(incoming.callback.startsWith('ur:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const a=incoming.callback.split(':');const u=findUser(a[2]);reset();\n    if(!u)say('کاربر پیدا نشد.');\n    else if(BOOTSTRAP_ADMIN_USER_IDS.includes(String(u.User_ID)) && a[1]==='v')say('نقش مدیر بازیابی را نمی‌توان از ربات حذف کرد.');\n    else {userMutation={...u,Role:a[1]==='a'?'admin':'viewer',Updated_At:now,Updated_By:userId};auditChange('user_role',u.User_ID,u,userMutation);say('✅ نقش کاربر تغییر کرد.\\n'+userDetails(userMutation),userMenu(userMutation));}}\n} else if(incoming.callback.startsWith('ut:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const u=findUser(incoming.callback.slice(3));reset();\n    if(!u)say('کاربر پیدا نشد.');\n    else if(BOOTSTRAP_ADMIN_USER_IDS.includes(String(u.User_ID)))say('مدیر بازیابی را نمی‌توان غیرفعال کرد.');\n    else {userMutation={...u,Active:String(u.Active).toLowerCase()==='true'?'false':'true',Updated_At:now,Updated_By:userId};auditChange('user_active',u.User_ID,u,userMutation);say('✅ وضعیت کاربر تغییر کرد.\\n'+userDetails(userMutation),userMenu(userMutation));}}\n} else if(incoming.callback.startsWith('nu:role:')) {\n  if(!isAdmin||step!=='new_user_role')say('این مرحله معتبر نیست.');\n  else {const role=incoming.callback.endsWith(':a')?'admin':'viewer';draft.Role=role;step='new_user_confirm';say('کاربر جدید:\\n'+userDetails({...draft,Role:role,Active:'true'})+'\\n\\nثبت شود؟',kb([[button('✅ تأیید ثبت کاربر','nu:save')],back()]));}\n} else if(incoming.callback==='nu:save') {\n  if(!isAdmin||step!=='new_user_confirm'||!draft.User_ID||!draft.Display_Name||!draft.Role)say('این مرحله معتبر نیست.');\n  else if(findUser(String(draft.User_ID))){reset();say('این شناسه قبلاً در فهرست کاربران وجود دارد.');}\n  else {userMutation={User_ID:draft.User_ID,Display_Name:draft.Display_Name,Role:draft.Role,Active:'true',Updated_At:now,Updated_By:userId};\n    auditChange('user_create',draft.User_ID,{},userMutation);reset();say('✅ همکار جدید ثبت شد.\\n'+userDetails(userMutation));}\n} else if(incoming.callback==='m:add') {\n  if(!isAdmin) say('⛔ فقط مدیر اجازه ثبت پروژه دارد.');\n  else {step='add_name';draft={};ask('➕ ثبت پروژه جدید\\nمرحله ۱/۴: نام پروژه را وارد کنید.');}\n} else if(incoming.callback.startsWith('m:manage:')) {\n  if(!isAdmin) say('⛔ فقط مدیر اجازه مدیریت پروژه‌ها دارد.');\n  else {reset();const d=paged(allProjects.slice().sort((a,b)=>String(a.Project_Name).localeCompare(String(b.Project_Name),'fa')),incoming.callback.split(':')[2],'m:manage','🛠 مدیریت پروژه‌ها');say(d.text,d.keyboard);}\n} else if(incoming.callback.startsWith('e:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const p=findProject(incoming.callback.slice(2));reset();if(!p)say('پروژه پیدا نشد.');else say('ویرایش پروژه:\\n'+projectText(p),kb([\n    [button('✏️ نام','f:name:'+p.Project_ID),button('✏️ گروه','f:group:'+p.Project_ID)],\n    [button('✏️ کد SAP','f:sap:'+p.Project_ID),button('🔄 وضعیت BOM','b:'+p.Project_ID)],back()]));}\n} else if(incoming.callback.startsWith('f:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const a=incoming.callback.split(':');const p=findProject(a[2]);if(!p)say('پروژه پیدا نشد.');else{step='edit_'+a[1];draft={Project_ID:p.Project_ID};ask('مقدار جدید را برای '+({name:'نام پروژه',group:'گروه پروژه',sap:'کد SAP'}[a[1]]||'فیلد')+' وارد کنید.');}}\n} else if(incoming.callback.startsWith('b:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const p=findProject(incoming.callback.slice(2));reset();if(!p)say('پروژه پیدا نشد.');else say(projectText(p)+'\\n\\nوضعیت جدید را انتخاب کنید:',kb([\n    [button('✅ ثبت شده','u:y:'+p.Project_ID),button('❌ ثبت نشده','u:n:'+p.Project_ID)],back()]));}\n} else if(incoming.callback.startsWith('u:')) {\n  if(!isAdmin) say('⛔ دسترسی ندارید.');\n  else {const a=incoming.callback.split(':');const p=findProject(a[2]);reset();if(!p)say('پروژه پیدا نشد.');else{\n    mutation={...p,BOM_Status:a[1]==='y'?'registered':'not_registered',\n      BOM_Updated_At:now,BOM_Updated_By:userId,Updated_At:now,Updated_By:userId};\n    auditChange('bom_change',p.Project_Group,p,mutation);\n    const d=details(mutation);say('✅ وضعیت BOM به‌روزرسانی شد.\\n\\n'+d.text,d.keyboard);\n  }}\n} else if(incoming.callback.startsWith('a:bom:')) {\n  if(!isAdmin || step!=='add_bom') say('این مرحله منقضی شده است. ثبت را از ابتدا شروع کنید.');\n  else {draft.BOM_Status=incoming.callback.endsWith(':y')?'registered':'not_registered';step='add_confirm';say('لطفاً اطلاعات را بررسی کنید:\\n\\n'+projectText({Project_Name:draft.Project_Name,Project_Group:draft.Project_Group,SAP_Code:draft.SAP_Code,BOM_Status:draft.BOM_Status})+'\\n\\nتأیید نهایی؟',kb([\n    [button('✅ ذخیره پروژه','a:save')],\n    [button('❌ لغو','m:main')]]));}\n} else if(incoming.callback==='a:save') {\n  if(!isAdmin || step!=='add_confirm' || !draft.Project_Name || !draft.Project_Group || !draft.SAP_Code || !draft.BOM_Status) say('ثبت معتبر نیست؛ از ابتدا شروع کنید.');\n  else {const duplicate=allProjects.find(p=>norm(p.Project_Group)===norm(draft.Project_Group));\n    if(duplicate){reset();const d=details(duplicate);say('⚠️ پروژه‌ای با همین گروه پروژه و کد SAP وجود دارد. ثبت تکراری انجام نشد.\\n\\n'+d.text,d.keyboard);}\n    else {const id='P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);mutation={Project_ID:id,Project_Name:draft.Project_Name,Project_Group:draft.Project_Group,SAP_Code:String(draft.SAP_Code),BOM_Status:draft.BOM_Status,\n      BOM_Updated_At:now,BOM_Updated_By:userId,Updated_At:now,Updated_By:userId};\n      auditChange('project_create',mutation.Project_Group,{},mutation);reset();say('✅ پروژه ثبت شد.\\n\\n'+projectText(mutation));}\n  }\n} else if(incoming.callback) {\n  say('دکمه نامعتبر یا قدیمی است. از منوی اصلی ادامه دهید.');\n} else if(isAdmin && step==='new_user_id') {\n  const val=norm(incoming.text);\n  if(!/^\\d{3,20}$/.test(val))ask('شناسه بله باید عددی باشد. دوباره وارد کنید.');\n  else {draft.User_ID=val;step='new_user_name';ask('نام و نام خانوادگی همکار را وارد کنید.');}\n} else if(isAdmin && step==='new_user_name') {\n  const val=incoming.text.trim();\n  if(val.length<2||val.length>80)ask('نام باید بین ۲ تا ۸۰ کاراکتر باشد. دوباره وارد کنید.');\n  else {draft.Display_Name=val;step='new_user_role';say('سطح دسترسی همکار را انتخاب کنید:',kb([\n    [button('👁 فقط مشاهده','nu:role:v'),button('👑 مدیر','nu:role:a')],back()]));}\n} else if(isAdmin && step.startsWith('edit_')) {\n  const p=findProject(String(draft.Project_ID||''));const field=step.slice(5);const val=incoming.text.trim();reset();\n  if(!p) say('پروژه پیدا نشد.');\n  else if(!val || val.length>120) say('مقدار نامعتبر است؛ باید ۱ تا ۱۲۰ کاراکتر باشد.');\n  else if(field==='sap'&&!/^[0-9۰-۹٠-٩]+$/.test(val)) say('کد SAP باید عددی باشد.');\n  else if(field==='group'&&allProjects.some(o=>String(o.Project_ID)!==String(p.Project_ID)&&norm(o.Project_Group)===norm(val)))say('این گروه پروژه قبلاً ثبت شده و نمی‌تواند تکراری باشد.');\n  else {mutation={...p,Updated_At:now,Updated_By:userId};const map={name:'Project_Name',group:'Project_Group',sap:'SAP_Code'};mutation[map[field]]=val;\n    auditChange('project_edit_'+field,p.Project_Group,p,mutation);const d=details(mutation);say('✅ اطلاعات ویرایش شد.\\n\\n'+d.text,d.keyboard);}\n} else if(isAdmin && step.startsWith('add_') && incoming.text) {\n  const val=incoming.text.trim();\n  if(!val || val.length>120) ask('مقدار باید ۱ تا ۱۲۰ کاراکتر باشد. دوباره وارد کنید.');\n  else if(step==='add_name'){draft.Project_Name=val;step='add_group';ask('مرحله ۲/۴: گروه پروژه را وارد کنید (مثلاً 912B-938).');}\n  else if(step==='add_group'){draft.Project_Group=val;step='add_sap';ask('مرحله ۳/۴: کد محصول SAP را وارد کنید.');}\n  else if(step==='add_sap'){\n    if(!/^[0-9۰-۹٠-٩]+$/.test(val))ask('کد SAP باید فقط عدد باشد. دوباره وارد کنید.');\n    else {draft.SAP_Code=val;step='add_bom';say('مرحله ۴/۴: آیا BOM ثبت شده است؟',kb([\n      [button('✅ ثبت شده','a:bom:y'),button('❌ ثبت نشده','a:bom:n')],\n      [button('❌ لغو','m:main')]]));}\n  }\n} else if(incoming.text) {\n  const q=norm(incoming.text);\n  const results=allProjects.filter(p=>[p.Project_Name,p.Project_Group,p.SAP_Code].some(v=>norm(v).includes(q)));\n  step='search';draft={};\n  if(!results.length) ask('🔍 پروژه‌ای با عبارت «'+incoming.text+'» پیدا نشد.\\nعبارت دیگری بفرستید یا لغو کنید.');\n  else if(results.length===1){const d=details(results[0]);say(d.text,d.keyboard);reset();}\n  else {draft={query:incoming.text};step='search_results';const d=paged(results,0,'s:page','🔎 نتایج جستجوی «'+incoming.text+'»');say(d.text,d.keyboard);}\n} else {\n  say('به دستیار اطلاعات پروژه‌های سازمان خوش آمدید. گزینه موردنظر را انتخاب کنید.');\n}\n\nconst session = {\n  User_ID:userId, Step:step, Draft_JSON:JSON.stringify(draft), Updated_At:now,\n};\nreturn [{json:{\n  chat_id:chatId, user_id:userId, callback_id:incoming.callback_id,\n  text, keyboard, session, mutation, userMutation, audit, readFailure:readError,\n}}];"
+      }
+    },
+    {
+      "id": "conex-014",
+      "name": "Read Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-ReadError",
+              "leftValue": "={{ $('Plan Bot Response').first().json.readFailure }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-008",
+      "name": "Save Session",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        150
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sessions",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "User_ID": "={{ $('Plan Bot Response').first().json.session.User_ID }}",
+            "Step": "={{ $('Plan Bot Response').first().json.session.Step }}",
+            "Draft_JSON": "={{ $('Plan Bot Response').first().json.session.Draft_JSON }}",
+            "Updated_At": "={{ $('Plan Bot Response').first().json.session.Updated_At }}"
+          },
+          "matchingColumns": [
+            "User_ID"
+          ],
+          "schema": [
+            {
+              "id": "User_ID",
+              "displayName": "User_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Step",
+              "displayName": "Step",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Draft_JSON",
+              "displayName": "Draft_JSON",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated_At",
+              "displayName": "Updated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "error"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-016",
+      "name": "Session Save Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-SessionSaveError",
+              "leftValue": "={{ !!$json.error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-009",
+      "name": "Project Change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-ProjectChange",
+              "leftValue": "={{ $('Plan Bot Response').first().json.mutation !== null }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-010",
+      "name": "Save Project",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        150
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Projects",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Project_ID": "={{ $('Plan Bot Response').first().json.mutation.Project_ID }}",
+            "Project_Name": "={{ $('Plan Bot Response').first().json.mutation.Project_Name }}",
+            "Project_Group": "={{ $('Plan Bot Response').first().json.mutation.Project_Group }}",
+            "SAP_Code": "={{ $('Plan Bot Response').first().json.mutation.SAP_Code }}",
+            "BOM_Status": "={{ $('Plan Bot Response').first().json.mutation.BOM_Status }}",
+            "BOM_Updated_At": "={{ $('Plan Bot Response').first().json.mutation.BOM_Updated_At }}",
+            "BOM_Updated_By": "={{ $('Plan Bot Response').first().json.mutation.BOM_Updated_By }}",
+            "Updated_At": "={{ $('Plan Bot Response').first().json.mutation.Updated_At }}",
+            "Updated_By": "={{ $('Plan Bot Response').first().json.mutation.Updated_By }}"
+          },
+          "matchingColumns": [
+            "Project_ID"
+          ],
+          "schema": [
+            {
+              "id": "Project_ID",
+              "displayName": "Project_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Project_Name",
+              "displayName": "Project_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Project_Group",
+              "displayName": "Project_Group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SAP_Code",
+              "displayName": "SAP_Code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "BOM_Status",
+              "displayName": "BOM_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "BOM_Updated_At",
+              "displayName": "BOM_Updated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "BOM_Updated_By",
+              "displayName": "BOM_Updated_By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated_At",
+              "displayName": "Updated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated_By",
+              "displayName": "Updated_By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "error"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-019",
+      "name": "Project Save Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-ProjectSaveError",
+              "leftValue": "={{ !!$json.error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-020",
+      "name": "User Change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-UserChange",
+              "leftValue": "={{ $('Plan Bot Response').first().json.userMutation !== null }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-021",
+      "name": "Save User",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2860,
+        150
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Users",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "User_ID": "={{ $('Plan Bot Response').first().json.userMutation.User_ID }}",
+            "Display_Name": "={{ $('Plan Bot Response').first().json.userMutation.Display_Name }}",
+            "Role": "={{ $('Plan Bot Response').first().json.userMutation.Role }}",
+            "Active": "={{ $('Plan Bot Response').first().json.userMutation.Active }}",
+            "Updated_At": "={{ $('Plan Bot Response').first().json.userMutation.Updated_At }}",
+            "Updated_By": "={{ $('Plan Bot Response').first().json.userMutation.Updated_By }}"
+          },
+          "matchingColumns": [
+            "User_ID"
+          ],
+          "schema": [
+            {
+              "id": "User_ID",
+              "displayName": "User_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Display_Name",
+              "displayName": "Display_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Role",
+              "displayName": "Role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Active",
+              "displayName": "Active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated_At",
+              "displayName": "Updated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Updated_By",
+              "displayName": "Updated_By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "error"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-022",
+      "name": "User Save Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3080,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-UserSaveError",
+              "leftValue": "={{ !!$json.error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-023",
+      "name": "Audit Change?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3300,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-AuditChange",
+              "leftValue": "={{ $('Plan Bot Response').first().json.audit !== null }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-024",
+      "name": "Save Audit Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3520,
+        150
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "AuditLog",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Event_ID": "={{ $('Plan Bot Response').first().json.audit.Event_ID }}",
+            "Action": "={{ $('Plan Bot Response').first().json.audit.Action }}",
+            "Entity_ID": "={{ $('Plan Bot Response').first().json.audit.Entity_ID }}",
+            "User_ID": "={{ $('Plan Bot Response').first().json.audit.User_ID }}",
+            "Timestamp": "={{ $('Plan Bot Response').first().json.audit.Timestamp }}",
+            "Before_JSON": "={{ $('Plan Bot Response').first().json.audit.Before_JSON }}",
+            "After_JSON": "={{ $('Plan Bot Response').first().json.audit.After_JSON }}"
+          },
+          "matchingColumns": [
+            "Event_ID"
+          ],
+          "schema": [
+            {
+              "id": "Event_ID",
+              "displayName": "Event_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Action",
+              "displayName": "Action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Entity_ID",
+              "displayName": "Entity_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User_ID",
+              "displayName": "User_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Before_JSON",
+              "displayName": "Before_JSON",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "After_JSON",
+              "displayName": "After_JSON",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "handlingExtraData": "error"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_SHEETS_CREDENTIAL"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "conex-025",
+      "name": "Audit Save Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3740,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-AuditSaveError",
+              "leftValue": "={{ !!$json.error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-001",
+      "name": "Send Bale Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3960,
+        150
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://tapi.bale.ai/bot' + $env.BALE_BOT_TOKEN + '/sendMessage' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({chat_id:$('Plan Bot Response').first().json.chat_id,text:$('Plan Bot Response').first().json.text,reply_markup:$('Plan Bot Response').first().json.keyboard}) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "conex-011",
+      "name": "Was Button Clicked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4180,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-WasButtonClicked",
+              "leftValue": "={{ $('Plan Bot Response').first().json.callback_id !== '' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "conex-002",
+      "name": "Acknowledge Button",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4400,
+        150
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://tapi.bale.ai/bot' + $env.BALE_BOT_TOKEN + '/answerCallbackQuery' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({callback_query_id:$('Plan Bot Response').first().json.callback_id}) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "6fbe8e43-c990-42cd-8882-4361437893ba",
+      "name": "Send Data Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3300,
+        450
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://tapi.bale.ai/bot' + $env.BALE_BOT_TOKEN + '/sendMessage' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({chat_id:$('Plan Bot Response').first().json.chat_id,text:'⚠️ خطای ارتباط یا ذخیره‌سازی رخ داد. ممکن است تغییر در بانک اطلاعاتی انجام شده باشد؛ پیش از تکرار ثبت، وضعیت پروژه را بررسی کنید و در صورت نیاز به مدیر سامانه اطلاع دهید.'}) }}",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "conex-027",
+      "name": "Daily Backup",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        660
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "disabled": true
+    },
+    {
+      "id": "conex-028",
+      "name": "Copy Sheet Backup",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        220,
+        660
+      ],
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "name": "={{ 'CONEX_Backup_' + $now.toFormat('yyyy-MM-dd_HH-mm') }}",
+        "sameFolder": false,
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_DRIVE_BACKUP_FOLDER_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "SELECT_YOUR_GOOGLE_DRIVE_CREDENTIAL"
+        }
+      },
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Bale Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Bale Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Bale Event": {
+      "main": [
+        [
+          {
+            "node": "Read Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sessions": {
+      "main": [
+        [
+          {
+            "node": "Read Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Users": {
+      "main": [
+        [
+          {
+            "node": "Read Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Projects": {
+      "main": [
+        [
+          {
+            "node": "Plan Bot Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Bot Response": {
+      "main": [
+        [
+          {
+            "node": "Read Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Data Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session": {
+      "main": [
+        [
+          {
+            "node": "Session Save Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Save Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Data Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Project Change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Project Change?": {
+      "main": [
+        [
+          {
+            "node": "Save Project",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User Change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Project": {
+      "main": [
+        [
+          {
+            "node": "Project Save Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Project Save Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Data Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User Change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Change?": {
+      "main": [
+        [
+          {
+            "node": "Save User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Audit Change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save User": {
+      "main": [
+        [
+          {
+            "node": "User Save Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Save Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Data Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Audit Change?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Change?": {
+      "main": [
+        [
+          {
+            "node": "Save Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Bale Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Audit Save Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Save Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Data Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Bale Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Bale Reply": {
+      "main": [
+        [
+          {
+            "node": "Was Button Clicked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was Button Clicked?": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Backup": {
+      "main": [
+        [
+          {
+            "node": "Copy Sheet Backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Tehran",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
